@@ -1,0 +1,6 @@
+{
+  "name": "CZ OTE 15min Spot",
+  "domain": "cz_ote_15m",
+  "homeassistant": "2023.9.0",
+  "render_readme": true
+}
