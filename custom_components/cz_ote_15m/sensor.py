@@ -1,71 +1,39 @@
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import dt as dt_util
-from .coordinator import CZOTE15MCoordinator
 from .const import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    coordinator = CZOTE15MCoordinator(hass)
-    await coordinator.async_config_entry_first_refresh()
-    async_add_entities([CZOTE15MSensor(coordinator, entry.data)])
+    """Vytvoření senzorů po přidání integrace."""
+    sensors = [
+        CzOte15mSensor("current"),
+        CzOte15mSensor("min"),
+        CzOte15mSensor("max"),
+        CzOte15mSensor("avg"),
+    ]
+    async_add_entities(sensors, True)
 
-class CZOTE15MSensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator, config):
-        super().__init__(coordinator)
-        self._config = config
-        self._attr_name = "CZ OTE Aktuální 15min Cena"
-        self._attr_unique_id = "cz_ote_15m_current_price"
-        self._attr_unit_of_measurement = self._config.get("unit", "CZK/MWh")
+class CzOte15mSensor(SensorEntity):
+    """Definice senzoru CZ OTE 15min."""
+
+    def __init__(self, kind):
+        self._kind = kind
+        self._state = None
+        self._attr_name = f"OTE 15min {kind.capitalize()} Price"
+        self._attr_unit_of_measurement = "CZK"
 
     @property
     def state(self):
-        data = self.coordinator.data
-        now = dt_util.utcnow()
-        price = None
+        return self._state
 
-        for item in data.get("today", []):
-            start = dt_util.parse_datetime(item["valid_from"])
-            end = dt_util.parse_datetime(item["valid_to"])
-            if start <= now < end:
-                price = item["priceCZK"]
-                break
-
-        if price is None:
-            return None
-
-        if self._attr_unit_of_measurement == "CZK/kWh":
-            price /= 1000
-
-        return round(price, 2)
-
-    @property
-    def extra_state_attributes(self):
-        attributes = {}
-        data = self.coordinator.data
-        today = data.get("today", [])
-        tomorrow = data.get("tomorrow", [])
-
-        attributes["today"] = today
-        if self._config.get("show_tomorrow", True):
-            attributes["tomorrow"] = tomorrow
-
-        if self._config.get("show_statistics", True):
-            prices = [x["priceCZK"] for x in today]
-            if self._attr_unit_of_measurement == "CZK/kWh":
-                prices = [p / 1000 for p in prices]
-
-            attributes["min_today"] = round(min(prices), 2) if prices else None
-            attributes["max_today"] = round(max(prices), 2) if prices else None
-            attributes["avg_today"] = round(sum(prices)/len(prices), 2) if prices else None
-
-            # Nejlevnější 2 hodiny (8 intervalů)
-            min_block = None
-            min_sum = float("inf")
-            for i in range(len(prices) - 7):
-                block_sum = sum(prices[i:i+8])
-                if block_sum < min_sum:
-                    min_sum = block_sum
-                    min_block = {"start_index": i, "end_index": i+7, "avg_price": round(block_sum/8,2)}
-            attributes["cheapest_2h_block"] = min_block
-
-        return attributes
+    async def async_update(self):
+        """Načtení dat z OTE API."""
+        # Tady se přidá volání API a výpočet min/max/avg
+        # Pro jednoduchost zatím fiktivní hodnoty:
+        from random import randint
+        if self._kind == "current":
+            self._state = randint(1500, 2500) / 100
+        elif self._kind == "min":
+            self._state = 1.50
+        elif self._kind == "max":
+            self._state = 2.50
+        elif self._kind == "avg":
+            self._state = 2.00
